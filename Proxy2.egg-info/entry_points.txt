@@ -1,0 +1,4 @@
+
+        [console_scripts]
+        proxy2_setup=proxy2:setup_https_intercept.sh
+    

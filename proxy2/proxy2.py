@@ -53,7 +53,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
     cacert = join_with_script_dir('ca.crt')
     certkey = join_with_script_dir('cert.key')
     certdir = join_with_script_dir('certs/')
-    timeout = 12120
+    timeout = 60
     lock = threading.Lock()
 
     def __init__(self, *args, **kwargs):
@@ -70,6 +70,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
         self.log_message(format, *args)
 
     def do_CONNECT(self):
+        print(self.cacert)
         if os.path.isfile(self.cakey) and os.path.isfile(self.cacert) and os.path.isfile(self.certkey) and os.path.isdir(self.certdir):
             self.connect_intercept()
         else:

@@ -1,0 +1,10 @@
+MANIFEST.in
+Proxy2.egg-info/PKG-INFO
+Proxy2.egg-info/SOURCES.txt
+Proxy2.egg-info/dependency_links.txt
+Proxy2.egg-info/entry_points.txt
+Proxy2.egg-info/not-zip-safe
+Proxy2.egg-info/top_level.txt
+proxy2/__init__.py
+proxy2/https_trasparent.py
+proxy2/proxy2.py

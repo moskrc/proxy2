@@ -1,4 +1,5 @@
 certs
+Proxy2.egg-info/SOURCES.txt
 *.crt
 *.key
 __pycache__

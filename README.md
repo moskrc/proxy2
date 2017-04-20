@@ -11,7 +11,7 @@ HTTP/HTTPS proxy in a single python script
 * support HTTP/1.1 Persistent Connection
 * support dynamic certificate generation for HTTPS intercept
 
-This script works on Python 2.7.
+This script works on Python 2.7 and Python 3.4.x
 You need to install OpenSSL to intercept HTTPS connections.
 
 
