@@ -12,19 +12,19 @@ import json
 import re
 from subprocess import Popen, PIPE
 
+from six import BytesIO
+
 try:
     import http.client as httplib
     import urllib.parse as urlparse
     from http.server import HTTPServer, BaseHTTPRequestHandler
     from socketserver import ThreadingMixIn
-    from io import StringIO
     from html.parser import HTMLParser
 except ImportError:
     import httplib
     import urlparse
     from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
     from SocketServer import ThreadingMixIn
-    from cStringIO import StringIO
     from HTMLParser import HTMLParser
 
 
@@ -53,7 +53,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
     cacert = join_with_script_dir('ca.crt')
     certkey = join_with_script_dir('cert.key')
     certdir = join_with_script_dir('certs/')
-    timeout = 5
+    timeout = 12120
     lock = threading.Lock()
 
     def __init__(self, *args, **kwargs):
@@ -198,11 +198,15 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
 
         setattr(res, 'headers', self.filter_headers(res.headers))
 
-        self.wfile.write("{} {} {}\r\n".format(self.protocol_version, res.status, res.reason).encode('latin_1'))
-        for k, v in res.headers.items():
-            self.send_header(k, v)
+        data = "%s %d %s\r\n" % (self.protocol_version, res.status, res.reason)
+        self.wfile.write(data.encode())
+        for line in res.headers._headers:
+            self.send_header(line[0], line[1])
         self.end_headers()
-        self.wfile.write(res_body.encode('latin_1'))
+        if res_body:
+            self.wfile.write(res_body)
+        else:
+            self.wfile.write(b'\r\n')
         self.wfile.flush()
 
         with self.lock:
@@ -248,7 +252,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
         if encoding == 'identity':
             data = text
         elif encoding in ('gzip', 'x-gzip'):
-            io = StringIO()
+            io = BytesIO()
             with gzip.GzipFile(fileobj=io, mode='wb') as f:
                 f.write(text)
             data = io.getvalue()
@@ -262,7 +266,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
         if encoding == 'identity':
             text = data
         elif encoding in ('gzip', 'x-gzip'):
-            io = StringIO(data)
+            io = BytesIO(data)
             with gzip.GzipFile(fileobj=io) as f:
                 text = f.read()
         elif encoding == 'deflate':
@@ -317,7 +321,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                 req_body_text = parse_qsl(req_body)
             elif content_type.startswith('application/json'):
                 try:
-                    json_obj = json.loads(req_body)
+                    json_obj = json.loads(req_body.decode())
                     json_str = json.dumps(json_obj, indent=2)
                     if json_str.count('\n') < 50:
                         req_body_text = json_str
@@ -348,7 +352,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
 
             if content_type.startswith('application/json'):
                 try:
-                    json_obj = json.loads(res_body)
+                    json_obj = json.loads(res_body.decode())
                     json_str = json.dumps(json_obj, indent=2)
                     if json_str.count('\n') < 50:
                         res_body_text = json_str
@@ -358,10 +362,11 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                 except ValueError:
                     res_body_text = res_body
             elif content_type.startswith('text/html'):
-                m = re.search(r'<title[^>]*>\s*([^<]+?)\s*</title>', res_body, re.I)
+                m = re.search(b'<title[^>]*>\s*([^<]+?)\s*</title>', res_body, re.I)
                 if m:
                     h = HTMLParser()
-                    print_color(32, "==== HTML TITLE ====\n{}\n".format(h.unescape(m.group(1))))
+                    if m.group(1):
+                        print_color(32, "==== HTML TITLE ====\n{}\n".format(h.unescape(m.group(1).decode())))
             elif content_type.startswith('text/') and len(res_body) < 1024:
                 res_body_text = res_body
 
