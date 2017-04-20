@@ -31,6 +31,9 @@ except ImportError:
 def print_color(c, s):
     print("\x1b[{}m{}\x1b[0m".format(c, s))
 
+def join_with_script_dir(path):
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), path)
+
 
 class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
     address_family = socket.AF_INET6
@@ -46,10 +49,10 @@ class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
 
 
 class ProxyRequestHandler(BaseHTTPRequestHandler):
-    cakey = 'ca.key'
-    cacert = 'ca.crt'
-    certkey = 'cert.key'
-    certdir = 'certs/'
+    cakey = join_with_script_dir('ca.key')
+    cacert = join_with_script_dir('ca.crt')
+    certkey = join_with_script_dir('cert.key')
+    certdir = join_with_script_dir('certs/')
     timeout = 5
     lock = threading.Lock()
 
@@ -91,10 +94,10 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
         self.wfile = self.connection.makefile("wb", self.wbufsize)
 
         conntype = self.headers.get('Proxy-Connection', '')
-        if conntype.lower() == 'close':
-            self.close_connection = 1
-        elif (conntype.lower() == 'keep-alive' and self.protocol_version >= "HTTP/1.1"):
+        if self.protocol_version == "HTTP/1.1" and conntype.lower() != 'close':
             self.close_connection = 0
+        else:
+            self.close_connection = 1
 
     def connect_relay(self):
         address = self.path.split(':', 1)
@@ -161,16 +164,25 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
             conn = self.tls.conns[origin]
             conn.request(self.command, path, req_body, dict(req.headers))
             res = conn.getresponse()
-            res_body = res.read().decode('latin_1')
+            version_table = {10: 'HTTP/1.0', 11: 'HTTP/1.1'}
+            setattr(res, 'headers', res.msg)
+            setattr(res, 'response_version', version_table[res.version])
+
+            # support streaming
+            if not 'Content-Length' in res.headers and 'no-store' in res.headers.get('Cache-Control', ''):
+                self.response_handler(req, req_body, res, '')
+                setattr(res, 'headers', self.filter_headers(res.headers))
+                self.relay_streaming(res)
+                with self.lock:
+                    self.save_handler(req, req_body, res, '')
+                return
+
+            res_body = res.read()
         except Exception as e:
             if origin in self.tls.conns:
                 del self.tls.conns[origin]
             self.send_error(502)
             return
-
-        version_table = {10: 'HTTP/1.0', 11: 'HTTP/1.1'}
-        setattr(res, 'headers', res.msg)
-        setattr(res, 'response_version', version_table[res.version])
 
         content_encoding = res.headers.get('Content-Encoding', 'identity')
         res_body_plain = self.decode_content_body(res_body, content_encoding)
@@ -196,8 +208,26 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
         with self.lock:
             self.save_handler(req, req_body, res, res_body_plain)
 
+    def relay_streaming(self, res):
+        self.wfile.write("%s %d %s\r\n" % (self.protocol_version, res.status, res.reason))
+        for line in res.headers.headers:
+            self.wfile.write(line)
+        self.end_headers()
+        try:
+            while True:
+                chunk = res.read(8192)
+                if not chunk:
+                    break
+                self.wfile.write(chunk)
+            self.wfile.flush()
+        except socket.error:
+            # connection closed by client
+            pass
+
     do_HEAD = do_GET
     do_POST = do_GET
+    do_PUT = do_GET
+    do_DELETE = do_GET
     do_OPTIONS = do_GET
 
     def filter_headers(self, headers):
