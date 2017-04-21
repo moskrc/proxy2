@@ -70,7 +70,6 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
         self.log_message(format, *args)
 
     def do_CONNECT(self):
-        print(self.cacert)
         if os.path.isfile(self.cakey) and os.path.isfile(self.cacert) and os.path.isfile(self.certkey) and os.path.isdir(self.certdir):
             self.connect_intercept()
         else:
@@ -292,7 +291,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
 
     def print_info(self, req, req_body, res, res_body):
         def parse_qsl(s):
-            return '\n'.join("{:<20} {}".format(k, v) for k, v in urlparse.parse_qsl(s, keep_blank_values=True))
+            return '\n'.join("{!s:<20} {}".format(k, v) for k, v in urlparse.parse_qsl(s, keep_blank_values=True))
 
         req_header_text = "{} {} {}\n{}".format(req.command, req.path, req.request_version, req.headers)
         res_header_text = "{} {} {}\n{}".format(res.response_version, res.status, res.reason, res.headers)
