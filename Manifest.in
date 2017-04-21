@@ -1,1 +1,4 @@
-include setup_https_intercept
+include README.md
+include LICENSE
+include proxy2/examples/*
+include proxy2/setup_https_intercept.sh

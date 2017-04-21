@@ -49,8 +49,5 @@ setup(
         'Topic :: Internet :: WWW/HTTP :: Dynamic Content',
         'Topic :: Software Development :: Libraries :: Python Modules'
     ],
-    entry_points='''
-        [console_scripts]
-        proxy2_setup=proxy2:setup_https_intercept.sh
-    '''
+    scripts=['proxy2/setup_https_intercept.sh',]
 )
